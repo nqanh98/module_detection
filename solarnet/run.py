@@ -9,6 +9,7 @@ from solarnet.preprocessing import MaskMaker, ImageSplitter
 from solarnet.datasets import ClassifierDataset, SegmenterDataset, make_masks
 from solarnet.models import Classifier, Segmenter, train_classifier, train_segmenter
 
+from .datasets.utils import denormalize
 
 class RunTask:
 
@@ -103,10 +104,10 @@ class RunTask:
         print("Generating test results")
         preds, true = [], []
         with torch.no_grad():
-            for test_x, test_y in tqdm(test_dataloader):
+            for test_x, y in tqdm(test_dataloader):
                 test_preds = model(test_x)
                 preds.append(test_preds.squeeze(1).cpu().numpy())
-                true.append(test_y.cpu().numpy())
+                true.append(y.cpu().numpy())
 
         np.save(savedir / 'classifier_preds.npy', np.concatenate(preds))
         np.save(savedir / 'classifier_true.npy', np.concatenate(true))
@@ -195,3 +196,61 @@ class RunTask:
         self.train_segmenter(max_epochs=s_max_epochs, val_size=s_val_size, test_size=s_test_size,
                              warmup=s_warmup, patience=s_patience, use_classifier=True,
                              data_folder=data_folder, device=device)
+
+    @staticmethod
+    def segmentation_pred(model_folder='data/models', data_folder='data/processed', device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')):
+        """
+        segmentation prediction method
+        predicts preprocessed image npy data
+
+        Args:
+            model_folder (str, optional): model folder path which have segmenter model. Defaults to 'data/model'.
+            data_folder (str, optional): data folder path which have preprocessed data and under which 'solar' dir is used. Defaults to 'data'.
+            device (torch.device, optional): cuda if available, else cpu
+            The device to predict. Defaults to torch.device('cuda:0' if torch.cuda.is_available() else 'cpu').
+        """
+        model_dir = Path(model_folder)
+        model = Segmenter()
+        if device.type != 'cpu': model = model.cuda()
+
+        model.load_state_dict(torch.load(model_dir / 'segmenter.model'))
+        print(model.eval())
+
+        processed_folder = Path(data_folder)
+
+        dataloader = DataLoader(SegmenterDataset(
+                                                    processed_folder=processed_folder,
+                                                    transform_images=False),
+                                                    batch_size=1)
+        images, preds, true = [], [], []
+        pred_dir = processed_folder / 'predictions'
+        cnt = 0
+        import cv2
+        with torch.no_grad():
+            for x, y in tqdm(dataloader):
+                pred = model(x)
+                x = x.cpu().numpy()
+                pred = pred.squeeze(1).cpu().numpy()
+                y = y.cpu().numpy()
+                images.append(x)
+                preds.append(pred)
+                true.append(y)
+                _, p0 = cv2.threshold(pred[0], 0.5, 255, cv2.THRESH_BINARY)
+                _, t0 = cv2.threshold(y[0], 0, 255, cv2.THRESH_BINARY)
+                # print(x[0].astype(np.uint8).transpose())
+                x0 = denormalize(x[0]).transpose()
+                p0 = p0.transpose()
+                t0 = t0.transpose()
+                # print(x0.shape, p0.shape, t0.shape)
+                # print(x0)
+                # print(p0)
+                # print(t0)
+                cv2.imwrite(str(pred_dir / f"{cnt}_image.png"), x0)
+                cv2.imwrite(str(pred_dir / f"{cnt}_pred.png"), p0)
+                cv2.imwrite(str(pred_dir / f"{cnt}_true.png"), t0)
+                cnt += 1
+        
+        np.save(pred_dir / 'segmenter_images.npy', np.concatenate(images))
+        np.save(pred_dir / 'segmenter_preds.npy', np.concatenate(preds))
+        np.save(pred_dir / 'segmenter_true.npy', np.concatenate(true))
+
