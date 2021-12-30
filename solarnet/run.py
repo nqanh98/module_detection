@@ -5,7 +5,7 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 
-from solarnet.preprocessing import MaskMaker, ImageSplitter
+from solarnet.preprocessing import MaskMaker, ImageSplitter, OrthoSplitter
 from solarnet.datasets import ClassifierDataset, SegmenterDataset, make_masks
 from solarnet.models import Classifier, Segmenter, train_classifier, train_segmenter
 
@@ -45,6 +45,28 @@ class RunTask:
         """
         splitter = ImageSplitter(data_folder=Path(data_folder))
         splitter.process(imsize=imsize, empty_ratio=empty_ratio)
+
+    @staticmethod
+    def split_ortho(ortho_folder, data_folder='data/processed', ortho_split_size=448, imsize=224, prediction=False):
+        """Generates images (and their corresponding masks) of height = width = imsize
+        for input into the models.
+        Input Images are ORTHO image. They are cropped by ortho_split_size*ortho_split_size and resized to imsize*imsize image.
+
+        Parameters
+        ----------
+        ortho_folder: str
+            Path of the data folder, which should be set up such as `ortho_folder/org` and `ortho_folder/mask`
+        data_folder: str
+            Path of the data folder, in which cropped images are saved.
+        ortho_split_size: int, default: 224
+            Cropped size of ortho
+        imsize: int, default: 224
+            The size of the images to be generated
+        prediction: bool, default: False
+            If True, only org ortho data is splitted
+        """
+        splitter = OrthoSplitter(Path(ortho_folder), data_folder=Path(data_folder))
+        splitter.process(ortho_split_size=ortho_split_size, imsize=imsize, use_prediction=prediction)
 
     @staticmethod
     def train_classifier(max_epochs=100, warmup=2, patience=5, val_size=0.1,
@@ -114,7 +136,7 @@ class RunTask:
 
     @staticmethod
     def train_segmenter(max_epochs=100, val_size=0.1, test_size=0.1, warmup=2,
-                        patience=5, data_folder='data', use_classifier=True,
+                        patience=5, model_dir='models', data_folder='data/processed', use_classifier=True,
                         device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')):
         """Train the segmentation model
 
@@ -141,28 +163,28 @@ class RunTask:
         device: torch.device, default: cuda if available, else cpu
             The device to train the models on
         """
-        data_folder = Path(data_folder)
+        processed_folder = Path(data_folder)
         model = Segmenter()
         if device.type != 'cpu': model = model.cuda()
 
-        model_dir = data_folder / 'models'
+        model_dir = Path(model_dir)
         if use_classifier:
             classifier_sd = torch.load(model_dir / 'classifier.model')
             model.load_base(classifier_sd)
-        processed_folder = data_folder / 'processed'
+
         dataset = SegmenterDataset(processed_folder=processed_folder)
         train_mask, val_mask, test_mask = make_masks(len(dataset), val_size, test_size)
 
         dataset.add_mask(train_mask)
         train_dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
         val_dataloader = DataLoader(SegmenterDataset(mask=val_mask,
-                                                     processed_folder=processed_folder,
-                                                     transform_images=False),
+                                                    processed_folder=processed_folder,
+                                                    transform_images=False),
                                     batch_size=64, shuffle=True)
         test_dataloader = DataLoader(SegmenterDataset(mask=test_mask,
-                                                      processed_folder=processed_folder,
-                                                      transform_images=False),
-                                     batch_size=64)
+                                                    processed_folder=processed_folder,
+                                                    transform_images=False),
+                                    batch_size=64)
 
         train_segmenter(model, train_dataloader, val_dataloader, max_epochs=max_epochs,
                         warmup=warmup, patience=patience)

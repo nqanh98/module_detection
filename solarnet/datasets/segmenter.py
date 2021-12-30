@@ -6,15 +6,16 @@ import random
 from typing import Optional, List, Tuple
 
 from .utils import normalize
-from .transforms import no_change, horizontal_flip, vertical_flip, colour_jitter
+from .transforms import no_change, horizontal_flip, vertical_flip, colour_jitter, rotation
 
 
 class SegmenterDataset:
     def __init__(self,
                  processed_folder: Path = Path('data/processed'),
+                 use_ortho = False,
                  normalize: bool = True, transform_images: bool = True,
                  device: torch.device = torch.device('cuda:0' if
-                                                     torch.cuda.is_available() else 'cpu'),
+                                                    torch.cuda.is_available() else 'cpu'),
                  mask: Optional[List[bool]] = None) -> None:
 
         self.device = device
@@ -48,6 +49,7 @@ class SegmenterDataset:
             no_change,
             horizontal_flip,
             vertical_flip,
+            rotation,
             colour_jitter,
         ]
         chosen_function = random.choice(transforms)

@@ -5,6 +5,7 @@ mask transformations (if applicable)
 
 import numpy as np
 from typing import Tuple, Optional
+import cv2
 
 
 def no_change(image: np.ndarray,
@@ -35,6 +36,26 @@ def vertical_flip(image: np.ndarray,
     mask = mask[::-1, :]
     return image, mask
 
+def rotation(image: np.ndarray,
+                  mask: Optional[np.ndarray] = None) -> Tuple[np.ndarray,
+                                                              Optional[np.ndarray]]:
+    # input: image[channels, height, width]
+    # input: mask[height, width]
+    img_trans = image.copy().transpose(1, 2, 0)
+    height = img_trans.shape[0]
+    width = img_trans.shape[1]
+    center = (int(width/2), int(height/2))
+
+    angle = np.random.randint(0, 179)
+    scale = 1.0
+
+    trans = cv2.getRotationMatrix2D(center, angle , scale)
+    image2 = cv2.warpAffine(img_trans, trans, (width, height))
+    if mask is None: return image2.transpose(2, 0, 1)
+
+    # print(mask.shape)
+    mask2 = cv2.warpAffine(mask.copy(), trans, (width, height))
+    return image2.transpose(2, 0, 1), mask2
 
 def colour_jitter(image: np.ndarray,
                   mask: Optional[np.ndarray] = None) -> Tuple[np.ndarray,
