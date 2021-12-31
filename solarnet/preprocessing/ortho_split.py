@@ -113,7 +113,6 @@ class OrthoSplitter:
         x = torch.as_tensor(original, dtype=torch.float32)
 
         patches = x.unfold(2, ortho_split_size, ortho_split_size).unfold(3, ortho_split_size, ortho_split_size)
-        print(patches.size())
 
         cnt = 1
         size_ratio = imsize / ortho_split_size
@@ -124,6 +123,8 @@ class OrthoSplitter:
                 cropped = cv2.resize(cropped, dsize=None, fx=size_ratio, fy=size_ratio)
 
                 arr_name = os.path.split(ortho_file)[1] + '_' + '{:04}'.format(cnt)
+                print(arr_name)
+                cropped = cropped.transpose([2, 1, 0])
 
                 if self.size_okay(cropped, imsize):
                     np.save(str(org_dir) + '/' + arr_name, cropped)

@@ -136,7 +136,7 @@ class RunTask:
 
     @staticmethod
     def train_segmenter(max_epochs=100, val_size=0.1, test_size=0.1, warmup=2,
-                        patience=5, model_dir='models', data_folder='data/processed', use_classifier=True,
+                        patience=5, model_dir='models', data_folder='data/processed/solar', use_classifier=True,
                         device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')):
         """Train the segmentation model
 
@@ -220,7 +220,7 @@ class RunTask:
                              data_folder=data_folder, device=device)
 
     @staticmethod
-    def segmentation_pred(model_folder='data/models', data_folder='data/processed', device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')):
+    def segmentation_pred(model_folder='data/models', data_folder='data/processed/solar', device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')):
         """
         segmentation prediction method
         predicts preprocessed image npy data

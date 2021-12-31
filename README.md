@@ -120,3 +120,60 @@ docker run -it \
 --mount type=bind,source=<PATH_TO_DATA>,target=/solar/data \
 solar /bin/bash
 ```
+
+## 以下追記
+## オルソ画像でのsegmenter modelトレーニング方法
+### 画像の配置
+カラー画像とマスクの画像を用意する。  
+このフォルダとしてpath/to/orthoを作成する。  
+path/to/ortho内にorgとmaskフォルダを作成し、それぞれにカラーのオルソ画像とマスク画像を`同じファイル名`で配置する。
+
+### オルソ画像を分割する
+オルソ画像を分割して機械学習モデルにインプットのできるnpyファイルを生成する。  
+--ortho_folderフラグに対して、オルソ画像を配置したデータフォルダを指定する。  
+（1項前の例だと path/to/ortho を指定する）
+
+```bash
+python run.py split_ortho --ortho_folder=path/to/ortho
+```
+
+オプションとして分割後のデータ保存先--data_folderを指定することもできる。  
+デフォルトでは`data/processed/solar`が設定され、データ保存先フォルダ内にorgとmaskフォルダが作成され、その中に分割されたnpyファイルが生成される。
+
+### トレーニングを開始する
+
+```
+python run.py train_segmenter
+```
+
+オプションとしてnpyデータソースが配置されている--data_folderを指定することもできる。  
+デフォルトでは`data/processed/solar`が設定され、orgとmaskフォルダ内のnpyファイルがトレーニングデータとして利用される。
+
+## オルソ画像でのsegmenter model予測方法
+
+### 画像の配置
+カラー画像のオルソ画像を用意する。  
+配置先のフォルダとしてpath/to/orthoを作成する。  
+path/to/ortho内にorgフォルダを作成し、予測したいカラーのオルソ画像を配置する。
+
+### オルソ画像を分割する
+オルソ画像を分割して機械学習モデルにインプットのできるnpyファイルを生成する。  
+--ortho_folderフラグに対して、オルソ画像を配置したデータフォルダを指定する。  
+（1項前の例だと path/to/ortho を指定する）  
+このとき予測用の分割となるため、--predictionフラグを指定する。
+
+```bash
+python run.py split_ortho --ortho_folder=path/to/ortho --prediction
+```
+
+オプションとして分割後のデータ保存先--data_folderを指定することもできる。  
+デフォルトでは`data/processed/solar`が設定され、データ保存先フォルダ内にorgフォルダが作成され、その中に分割されたnpyファイルが生成される。
+
+### 予測を開始する
+```
+python run.py segmentation_pred
+```
+
+オプションとしてnpyデータソースが配置されている--data_folderを指定することもできる。  
+デフォルトでは`data/processed/solar`が設定され、orgとmaskフォルダ内のnpyファイルがトレーニングデータとして利用される。  
+予測結果は--data_folder内にpredictionフォルダが作成され、その中に予測結果が保存される。

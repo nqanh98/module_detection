@@ -11,7 +11,7 @@ from .transforms import no_change, horizontal_flip, vertical_flip, colour_jitter
 
 class SegmenterDataset:
     def __init__(self,
-                 processed_folder: Path = Path('data/processed'),
+                 processed_folder: Path = Path('data/processed/solar'),
                  use_ortho = False,
                  normalize: bool = True, transform_images: bool = True,
                  device: torch.device = torch.device('cuda:0' if
@@ -24,7 +24,7 @@ class SegmenterDataset:
 
         # We will only segment the images which we know have solar panels in them; the
         # other images should be filtered out by the classifier
-        solar_folder = processed_folder / 'solar'
+        solar_folder = processed_folder
 
         self.org_solar_files = list((solar_folder / 'org').glob("*.npy"))
         self.mask_solar_files = [solar_folder / 'mask' / f.name for f in self.org_solar_files]
