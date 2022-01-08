@@ -167,13 +167,24 @@ python run.py split_ortho --ortho_folder=path/to/ortho --prediction
 ```
 
 オプションとして分割後のデータ保存先--data_folderを指定することもできる。  
-デフォルトでは`data/processed/solar`が設定され、データ保存先フォルダ内にorgフォルダが作成され、その中に分割されたnpyファイルが生成される。
+デフォルトでは`data/processed/solar`が設定され、データ保存先フォルダ内に各オルソ画像のフォルダが生成され、かつその中にorgフォルダが作成され、分割されたnpyファイルが生成される。
 
 ### 予測を開始する
+短形の囲みなしの場合
 ```
 python run.py segmentation_pred
 ```
 
 オプションとしてnpyデータソースが配置されている--data_folderを指定することもできる。  
-デフォルトでは`data/processed/solar`が設定され、orgとmaskフォルダ内のnpyファイルがトレーニングデータとして利用される。  
+デフォルトでは`data/processed/solar`が設定され、各オルソフォルダの中のorgとmaskフォルダ内のnpyファイルが予測データとして利用される。  
+予測結果は--data_folder内にpredictionフォルダが作成され、その中に予測結果が保存される。
+
+
+短形の囲みありの場合
+```
+python run.py segmentation_pred_with_bounding_rect
+```
+
+オプションとしてnpyデータソースが配置されている--data_folderを指定することもできる。  
+デフォルトでは`data/processed/solar`が設定され、各オルソフォルダの中のorgとmaskフォルダ内のnpyファイルが予測データとして利用される。  
 予測結果は--data_folder内にpredictionフォルダが作成され、その中に予測結果が保存される。

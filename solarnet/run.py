@@ -1,3 +1,4 @@
+import os
 import torch
 from torch.utils.data import DataLoader
 
@@ -220,7 +221,7 @@ class RunTask:
                              data_folder=data_folder, device=device)
 
     @staticmethod
-    def segmentation_pred(model_folder='data/models', data_folder='data/processed/solar', device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')):
+    def segmentation_pred(model_folder='models', data_folder='data/processed/solar', output_folder='data/prediction', device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')):
         """
         segmentation prediction method
         predicts preprocessed image npy data
@@ -231,48 +232,138 @@ class RunTask:
             device (torch.device, optional): cuda if available, else cpu
             The device to predict. Defaults to torch.device('cuda:0' if torch.cuda.is_available() else 'cpu').
         """
+        import glob
+
         model_dir = Path(model_folder)
         model = Segmenter()
         if device.type != 'cpu': model = model.cuda()
 
         model.load_state_dict(torch.load(model_dir / 'segmenter.model'))
-        print(model.eval())
 
         processed_folder = Path(data_folder)
 
-        dataloader = DataLoader(SegmenterDataset(
-                                                    processed_folder=processed_folder,
-                                                    transform_images=False),
-                                                    batch_size=1)
-        images, preds, true = [], [], []
-        pred_dir = processed_folder / 'predictions'
-        cnt = 0
-        import cv2
-        with torch.no_grad():
-            for x, y in tqdm(dataloader):
-                pred = model(x)
-                x = x.cpu().numpy()
-                pred = pred.squeeze(1).cpu().numpy()
-                y = y.cpu().numpy()
-                images.append(x)
-                preds.append(pred)
-                true.append(y)
-                _, p0 = cv2.threshold(pred[0], 0.5, 255, cv2.THRESH_BINARY)
-                _, t0 = cv2.threshold(y[0], 0, 255, cv2.THRESH_BINARY)
-                # print(x[0].astype(np.uint8).transpose())
-                x0 = denormalize(x[0]).transpose()
-                p0 = p0.transpose()
-                t0 = t0.transpose()
-                # print(x0.shape, p0.shape, t0.shape)
-                # print(x0)
-                # print(p0)
-                # print(t0)
-                cv2.imwrite(str(pred_dir / f"{cnt}_image.png"), x0)
-                cv2.imwrite(str(pred_dir / f"{cnt}_pred.png"), p0)
-                cv2.imwrite(str(pred_dir / f"{cnt}_true.png"), t0)
-                cnt += 1
-        
-        np.save(pred_dir / 'segmenter_images.npy', np.concatenate(images))
-        np.save(pred_dir / 'segmenter_preds.npy', np.concatenate(preds))
-        np.save(pred_dir / 'segmenter_true.npy', np.concatenate(true))
+        indivi = glob.glob(str(processed_folder) + "/*")
+        indivi_dir = [f for f in indivi if not("jpg" in f)]
 
+        for ind in indivi_dir:
+            dataloader = DataLoader(SegmenterDataset(processed_folder=Path(ind),
+                                                        transform_images=False),
+                                                        batch_size=1)
+            images, preds, true = [], [], []
+            pred_dir = Path(output_folder) / os.path.basename(ind)
+            if not pred_dir.exists(): pred_dir.mkdir(parents=True)
+            cnt = 0
+            import cv2
+            with torch.no_grad():
+                for x, y in tqdm(dataloader):
+                    pred = model(x)
+                    x = x.cpu().numpy()
+                    pred = pred.squeeze(1).cpu().numpy()
+                    #y = y.cpu().numpy()
+                    images.append(x)
+                    preds.append(pred)
+                    #true.append(y)
+                    _, p0 = cv2.threshold(pred[0], 0.5, 255, cv2.THRESH_BINARY)
+                    #_, t0 = cv2.threshold(y[0], 0, 255, cv2.THRESH_BINARY)
+                    # print(x[0].astype(np.uint8).transpose())
+                    x0 = denormalize(x[0]).transpose()
+                    p0 = p0.transpose()
+
+                    #t0 = t0.transpose()
+                    # print(x0.shape, p0.shape, t0.shape)
+                    # print(x0)
+                    # print(p0)
+                    # print(t0)
+
+                    #print(panel_contours)
+
+                    cv2.imwrite(str(pred_dir) + '/' + '{:04}'.format(cnt) + "_half_image.png", x0)
+                    cv2.imwrite(str(pred_dir) + '/' + '{:04}'.format(cnt) + "_half_pred.png", p0)
+                    #cv2.imwrite(str(pred_dir / f"{cnt}_true.png"), t0)
+                    cnt += 1
+
+    @staticmethod
+    def segmentation_pred_with_bounding_rect(model_folder='models', data_folder='data/processed/solar', output_folder='data/prediction_with_bounding', device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')):
+        """
+        segmentation prediction method
+        predicts preprocessed image npy data
+
+        Args:
+            model_folder (str, optional): model folder path which have segmenter model. Defaults to 'data/model'.
+            data_folder (str, optional): data folder path which have preprocessed data and under which 'solar' dir is used. Defaults to 'data'.
+            device (torch.device, optional): cuda if available, else cpu
+            The device to predict. Defaults to torch.device('cuda:0' if torch.cuda.is_available() else 'cpu').
+        """
+        import glob
+
+        model_dir = Path(model_folder)
+        model = Segmenter()
+        if device.type != 'cpu': model = model.cuda()
+
+        model.load_state_dict(torch.load(model_dir / 'segmenter.model'))
+
+        processed_folder = Path(data_folder)
+
+        indivi = glob.glob(str(processed_folder) + "/*")
+        indivi_dir = [f for f in indivi if not("jpg" in f)]
+
+        for ind in indivi_dir:
+            dataloader = DataLoader(SegmenterDataset(processed_folder=Path(ind),
+                                                        transform_images=False),
+                                                        batch_size=1)
+            images, preds, true = [], [], []
+            pred_dir = Path(output_folder) / os.path.basename(ind)
+            if not pred_dir.exists(): pred_dir.mkdir(parents=True)
+            cnt = 0
+            import cv2
+            with torch.no_grad():
+                for x, y in tqdm(dataloader):
+                    pred = model(x)
+                    x = x.cpu().numpy()
+                    pred = pred.squeeze(1).cpu().numpy()
+                    #y = y.cpu().numpy()
+                    images.append(x)
+                    preds.append(pred)
+                    #true.append(y)
+                    _, p0 = cv2.threshold(pred[0], 0.5, 255, cv2.THRESH_BINARY)
+                    #_, t0 = cv2.threshold(y[0], 0, 255, cv2.THRESH_BINARY)
+                    # print(x[0].astype(np.uint8).transpose())
+                    x0 = denormalize(x[0]).transpose()
+                    p0 = p0.transpose()
+
+                    #t0 = t0.transpose()
+                    # print(x0.shape, p0.shape, t0.shape)
+                    # print(x0)
+                    # print(p0)
+                    # print(t0)
+
+                    # 輪郭の検出
+                    contours, hierarchy = cv2.findContours(p0.copy().astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    panel_contours = []
+                    #print(len(contours))
+                    for i in range(len(contours)):
+                        area = cv2.contourArea(contours[i])
+                        #if 30 <= area <= 500:
+                            # peri = cv2.arcLength(contours[i], True)
+                            # squareness = 4 * np.pi * area / peri**2
+                            # if 0.3 <= squareness <= 0.8: # https://answers.opencv.org/question/171583/eliminate-unwanted-contours-opencv/
+                        rect = cv2.minAreaRect(contours[i])
+
+                        (x, y), (width, height), angle = rect
+                        if max(width, height) > 0:
+                            aspect_ratio = min(width, height) / max(width, height)
+
+                            #if 0.2 <= aspect_ratio <= 0.8:
+                            box = cv2.boxPoints(rect)
+                            box = np.int0(box)
+
+                            #if cv2.contourArea(box) <= 500:
+                            panel_contours.append(box)
+
+                    #print(panel_contours)
+                    im_con = cv2.drawContours(cv2.UMat(np.zeros_like(p0)), panel_contours, -1, 255, -1)
+
+                    cv2.imwrite(str(pred_dir) + '/' + '{:04}'.format(cnt) + "_half_image.png", x0)
+                    cv2.imwrite(str(pred_dir) + '/' + '{:04}'.format(cnt) + "_half_pred.png", im_con)
+                    #cv2.imwrite(str(pred_dir / f"{cnt}_true.png"), t0)
+                    cnt += 1

@@ -105,7 +105,14 @@ class OrthoSplitter:
                     cnt += 1
         return cnt-1
 
-    def _split_ortho_prediction(self, ortho_file: str, org_dir: Path, ortho_split_size: int, imsize: int):
+    def _split_ortho_prediction(self, ortho_file: str, out_dir: Path, ortho_split_size: int, imsize: int):
+
+        
+        out_org_dir = out_dir / 'org'
+        out_mask_dir = out_dir / 'mask'
+        if not out_org_dir.exists(): out_org_dir.mkdir(parents=True)
+        if not out_mask_dir.exists(): out_mask_dir.mkdir(parents=True)
+
         import torch
         img = Image.open(ortho_file)
         original = np.expand_dims(np.asarray(img).transpose([2, 0, 1]), axis=0)
@@ -122,12 +129,16 @@ class OrthoSplitter:
                 cropped = cropped.transpose([2, 1, 0])
                 cropped = cv2.resize(cropped, dsize=None, fx=size_ratio, fy=size_ratio)
 
-                arr_name = os.path.split(ortho_file)[1] + '_' + '{:04}'.format(cnt)
+                mask_arr = np.zeros_like(cropped[0]).astype(np.float64)
+
+                arr_name = '{:04}'.format(cnt)
+
                 print(arr_name)
                 cropped = cropped.transpose([2, 1, 0])
 
                 if self.size_okay(cropped, imsize):
-                    np.save(str(org_dir) + '/' + arr_name, cropped)
+                    np.save(str(out_org_dir) + '/' + arr_name, cropped)
+                    np.save(str(out_mask_dir) + '/' + arr_name, mask_arr)
                     cnt += 1
         return cnt-1
 
@@ -154,15 +165,17 @@ class OrthoSplitter:
         image-mask combination saved to ensure uniqueness
         """
         solar_dir = self.processed_folder / 'solar'
-        solar_mask_dir = solar_dir / 'mask'
-        solar_org_dir = solar_dir / 'org'
 
         ortho_files = glob.glob(str(self.ortho_org_folder) + "/*.tif")
         cnt = 0
         for of in ortho_files:
             if use_prediction:
-                cnt += self._split_ortho_prediction(of, solar_org_dir, ortho_split_size, imsize)
+                basename = os.path.splitext(os.path.basename(of))[0]
+                pred_dir = solar_dir / basename
+                cnt += self._split_ortho_prediction(of, pred_dir, ortho_split_size, imsize)
             else:
+                solar_mask_dir = solar_dir / 'mask'
+                solar_org_dir = solar_dir / 'org'
                 cnt += self._split_ortho(of, solar_mask_dir, solar_org_dir, ortho_split_size, imsize)
 
         print(f"Generated {cnt} samples")
