@@ -14,6 +14,7 @@ import pathlib
 
 from typing import Tuple
 
+
 class OrthoSplitter:
     """
 
@@ -30,13 +31,16 @@ class OrthoSplitter:
         self.ortho_mask_folder = self.ortho_folder / 'mask'
 
         if not self.ortho_org_folder.exists():
-            raise ValueError("org folder is not exist in {}".format(self.ortho_folder))
+            raise ValueError(
+                "org folder is not exist in {}".format(self.ortho_folder))
         if not self.ortho_mask_folder.exists():
-            raise ValueError("org folder is not exist in {}".format(self.ortho_folder))
+            raise ValueError(
+                "org folder is not exist in {}".format(self.ortho_folder))
 
         # setup; make the necessary folders
         self.processed_folder = data_folder
-        if not self.processed_folder.exists(): self. processed_folder.mkdir()
+        if not self.processed_folder.exists():
+            self. processed_folder.mkdir()
 
         self.solar_panels = self._setup_folder('solar')
         self.empty = self._setup_folder('empty')
@@ -44,11 +48,13 @@ class OrthoSplitter:
     def _setup_folder(self, folder_name: str) -> Path:
 
         full_folder_path = self.processed_folder / folder_name
-        if not full_folder_path.exists(): full_folder_path.mkdir()
+        if not full_folder_path.exists():
+            full_folder_path.mkdir()
 
         for subfolder in ['org', 'mask']:
             subfolder_name = full_folder_path / subfolder
-            if not subfolder_name.exists(): subfolder_name.mkdir()
+            if not subfolder_name.exists():
+                subfolder_name.mkdir()
 
         return full_folder_path
 
@@ -62,38 +68,43 @@ class OrthoSplitter:
         import torch
 
         tmp_file = pathlib.Path(ortho_file)
-        mask_file = tmp_file.parents[1] / "mask" / tmp_file.name # マスクのファイル
-        
+        mask_file = tmp_file.parents[1] / "mask" / tmp_file.name  # マスクのファイル
+
         img = Image.open(ortho_file)
-        
+
         mask_img = Image.open(mask_file).convert('L')
         original = np.expand_dims(np.asarray(img).transpose([2, 1, 0]), axis=0)
-        
+
         mask = np.array(mask_img)
 
         x = torch.as_tensor(original, dtype=torch.float32)
         x_mask = torch.as_tensor(mask, dtype=torch.float32)
 
         #patches = x.unfold(2, 224, 224).unfold(3, 224, 224)
-        patches = x.unfold(2, ortho_split_size, ortho_split_size).unfold(3, ortho_split_size, ortho_split_size)
-        patches_mask = x_mask.unfold(0, ortho_split_size, ortho_split_size).unfold(1, ortho_split_size, ortho_split_size)
+        patches = x.unfold(2, ortho_split_size, ortho_split_size).unfold(
+            3, ortho_split_size, ortho_split_size)
+        patches_mask = x_mask.unfold(0, ortho_split_size, ortho_split_size).unfold(
+            1, ortho_split_size, ortho_split_size)
 
         cnt = 1
         size_ratio = imsize / ortho_split_size
         for i in range(patches.shape[2]):
             for j in range(patches.shape[3]):
-                cropped = patches[0, : , i, j, :, :].detach().numpy().copy()
+                cropped = patches[0, :, i, j, :, :].detach().numpy().copy()
                 cropped = cropped.transpose([2, 1, 0])
-                cropped = cv2.resize(cropped, dsize=None, fx=size_ratio, fy=size_ratio)
+                cropped = cv2.resize(cropped, dsize=None,
+                                     fx=size_ratio, fy=size_ratio)
                 cropped = cropped.transpose([2, 1, 0])
                 # gray_img = cv2.cvtColor(cropped.transpose([2, 1, 0]), cv2.COLOR_RGB2GRAY).astype(np.uint8)
                 # print(gray_img.shape)
                 # gray_img = cv2.resize(gray_img, dsize=None, fx=size_ratio, fy=size_ratio)
                 cropped_mask = patches_mask[i, j, :, :].detach().numpy().copy()
-                cropped_mask = cv2.resize(cropped_mask, dsize=None, fx=size_ratio, fy=size_ratio)
+                cropped_mask = cv2.resize(
+                    cropped_mask, dsize=None, fx=size_ratio, fy=size_ratio)
                 # mask_arr = np.zeros_like(gray_img).astype(np.float64)
 
-                arr_name = os.path.split(ortho_file)[1] + '_' + '{:04}'.format(cnt)
+                arr_name = os.path.split(ortho_file)[
+                    1] + '_' + '{:04}'.format(cnt)
                 # cv2.imwrite("cropped.png", cropped.transpose())
                 # cv2.imwrite("cropped_mask.png", cropped_mask)
                 # exit(0)
@@ -107,31 +118,36 @@ class OrthoSplitter:
 
     def _split_ortho_prediction(self, ortho_file: str, out_dir: Path, ortho_split_size: int, imsize: int):
 
-        
         out_org_dir = out_dir / 'org'
         out_mask_dir = out_dir / 'mask'
-        if not out_org_dir.exists(): out_org_dir.mkdir(parents=True)
-        if not out_mask_dir.exists(): out_mask_dir.mkdir(parents=True)
+        if not out_org_dir.exists():
+            out_org_dir.mkdir(parents=True)
+        if not out_mask_dir.exists():
+            out_mask_dir.mkdir(parents=True)
 
         import torch
         img = Image.open(ortho_file)
-        original = np.expand_dims(np.asarray(img).transpose([2, 0, 1]), axis=0)
+        original = np.expand_dims(np.asarray(
+            img.convert("RGB")).transpose([2, 0, 1]), axis=0)
 
         x = torch.as_tensor(original, dtype=torch.float32)
 
-        patches = x.unfold(2, ortho_split_size, ortho_split_size).unfold(3, ortho_split_size, ortho_split_size)
+        patches = x.unfold(2, ortho_split_size, ortho_split_size).unfold(
+            3, ortho_split_size, ortho_split_size)
 
         cnt = 1
         size_ratio = imsize / ortho_split_size
         for i in range(patches.shape[2]):
             for j in range(patches.shape[3]):
-                cropped = patches[0, : , i, j, :, :].detach().numpy().copy()
+                cropped = patches[0, :, i, j, :, :].detach().numpy().copy()
                 cropped = cropped.transpose([2, 1, 0])
-                cropped = cv2.resize(cropped, dsize=None, fx=size_ratio, fy=size_ratio)
+                cropped = cv2.resize(cropped, dsize=None,
+                                     fx=size_ratio, fy=size_ratio)
 
                 mask_arr = np.zeros_like(cropped[0]).astype(np.float64)
 
-                arr_name = '{:04}'.format(cnt)
+                arr_name = os.path.split(ortho_file)[
+                    1][:-4] + '_' + '{:04}'.format(cnt)
 
                 print(arr_name)
                 cropped = cropped.transpose([2, 1, 0])
@@ -148,7 +164,7 @@ class OrthoSplitter:
             return True
         return False
 
-    def process(self, ortho_split_size: int, imsize: int=224, use_prediction=False) -> None:
+    def process(self, ortho_split_size: int, imsize: int = 224, use_prediction=False) -> None:
         """Creates the solar and empty images, and their corresponding masks
 
         Parameters
@@ -166,16 +182,19 @@ class OrthoSplitter:
         """
         solar_dir = self.processed_folder / 'solar'
 
-        ortho_files = glob.glob(str(self.ortho_org_folder) + "/*.tif")
+        ortho_files = glob.glob(str(self.ortho_org_folder) + "/*.JPG")
         cnt = 0
         for of in ortho_files:
             if use_prediction:
-                basename = os.path.splitext(os.path.basename(of))[0]
+                basename = os.path.splitext(os.path.basename(of))[
+                    0].split('_')[0]
                 pred_dir = solar_dir / basename
-                cnt += self._split_ortho_prediction(of, pred_dir, ortho_split_size, imsize)
+                cnt += self._split_ortho_prediction(of,
+                                                    pred_dir, ortho_split_size, imsize)
             else:
                 solar_mask_dir = solar_dir / 'mask'
                 solar_org_dir = solar_dir / 'org'
-                cnt += self._split_ortho(of, solar_mask_dir, solar_org_dir, ortho_split_size, imsize)
+                cnt += self._split_ortho(of, solar_mask_dir,
+                                         solar_org_dir, ortho_split_size, imsize)
 
         print(f"Generated {cnt} samples")

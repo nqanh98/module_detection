@@ -1,6 +1,7 @@
 import os
 import torch
 from torch.utils.data import DataLoader
+import pickle
 
 import numpy as np
 from pathlib import Path
@@ -11,6 +12,7 @@ from solarnet.datasets import ClassifierDataset, SegmenterDataset, make_masks
 from solarnet.models import Classifier, Segmenter, train_classifier, train_segmenter
 
 from .datasets.utils import denormalize
+
 
 class RunTask:
 
@@ -48,7 +50,7 @@ class RunTask:
         splitter.process(imsize=imsize, empty_ratio=empty_ratio)
 
     @staticmethod
-    def split_ortho(ortho_folder, data_folder='data/processed', ortho_split_size=448, imsize=224, prediction=False):
+    def split_ortho(ortho_folder, data_folder='data/processed', ortho_split_size=224, imsize=224, prediction=False):
         """Generates images (and their corresponding masks) of height = width = imsize
         for input into the models.
         Input Images are ORTHO image. They are cropped by ortho_split_size*ortho_split_size and resized to imsize*imsize image.
@@ -66,8 +68,10 @@ class RunTask:
         prediction: bool, default: False
             If True, only org ortho data is splitted
         """
-        splitter = OrthoSplitter(Path(ortho_folder), data_folder=Path(data_folder))
-        splitter.process(ortho_split_size=ortho_split_size, imsize=imsize, use_prediction=prediction)
+        splitter = OrthoSplitter(
+            Path(ortho_folder), data_folder=Path(data_folder))
+        splitter.process(ortho_split_size=ortho_split_size,
+                         imsize=imsize, use_prediction=prediction)
 
     @staticmethod
     def train_classifier(max_epochs=100, warmup=2, patience=5, val_size=0.1,
@@ -97,13 +101,15 @@ class RunTask:
         data_folder = Path(data_folder)
 
         model = Classifier()
-        if device.type != 'cpu': model = model.cuda()
+        if device.type != 'cpu':
+            model = model.cuda()
 
         processed_folder = data_folder / 'processed'
         dataset = ClassifierDataset(processed_folder=processed_folder)
 
         # make a train and val set
-        train_mask, val_mask, test_mask = make_masks(len(dataset), val_size, test_size)
+        train_mask, val_mask, test_mask = make_masks(
+            len(dataset), val_size, test_size)
 
         dataset.add_mask(train_mask)
         train_dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
@@ -120,7 +126,8 @@ class RunTask:
                          warmup=warmup, patience=patience)
 
         savedir = data_folder / 'models'
-        if not savedir.exists(): savedir.mkdir()
+        if not savedir.exists():
+            savedir.mkdir()
         torch.save(model.state_dict(), savedir / 'classifier.model')
 
         # save predictions for analysis
@@ -166,7 +173,8 @@ class RunTask:
         """
         processed_folder = Path(data_folder)
         model = Segmenter()
-        if device.type != 'cpu': model = model.cuda()
+        if device.type != 'cpu':
+            model = model.cuda()
 
         model_dir = Path(model_dir)
         if use_classifier:
@@ -174,23 +182,25 @@ class RunTask:
             model.load_base(classifier_sd)
 
         dataset = SegmenterDataset(processed_folder=processed_folder)
-        train_mask, val_mask, test_mask = make_masks(len(dataset), val_size, test_size)
+        train_mask, val_mask, test_mask = make_masks(
+            len(dataset), val_size, test_size)
 
         dataset.add_mask(train_mask)
         train_dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
         val_dataloader = DataLoader(SegmenterDataset(mask=val_mask,
-                                                    processed_folder=processed_folder,
-                                                    transform_images=False),
+                                                     processed_folder=processed_folder,
+                                                     transform_images=False),
                                     batch_size=64, shuffle=True)
         test_dataloader = DataLoader(SegmenterDataset(mask=test_mask,
-                                                    processed_folder=processed_folder,
-                                                    transform_images=False),
-                                    batch_size=64)
+                                                      processed_folder=processed_folder,
+                                                      transform_images=False),
+                                     batch_size=64)
 
         train_segmenter(model, train_dataloader, val_dataloader, max_epochs=max_epochs,
                         warmup=warmup, patience=patience)
 
-        if not model_dir.exists(): model_dir.mkdir()
+        if not model_dir.exists():
+            model_dir.mkdir()
         torch.save(model.state_dict(), model_dir / 'segmenter.model')
 
         print("Generating test results")
@@ -236,7 +246,8 @@ class RunTask:
 
         model_dir = Path(model_folder)
         model = Segmenter()
-        if device.type != 'cpu': model = model.cuda()
+        if device.type != 'cpu':
+            model = model.cuda()
 
         model.load_state_dict(torch.load(model_dir / 'segmenter.model'))
 
@@ -247,11 +258,12 @@ class RunTask:
 
         for ind in indivi_dir:
             dataloader = DataLoader(SegmenterDataset(processed_folder=Path(ind),
-                                                        transform_images=False),
-                                                        batch_size=1)
+                                                     transform_images=False),
+                                    batch_size=1)
             images, preds, true = [], [], []
             pred_dir = Path(output_folder) / os.path.basename(ind)
-            if not pred_dir.exists(): pred_dir.mkdir(parents=True)
+            if not pred_dir.exists():
+                pred_dir.mkdir(parents=True)
             cnt = 0
             import cv2
             with torch.no_grad():
@@ -262,7 +274,7 @@ class RunTask:
                     #y = y.cpu().numpy()
                     images.append(x)
                     preds.append(pred)
-                    #true.append(y)
+                    # true.append(y)
                     _, p0 = cv2.threshold(pred[0], 0.5, 255, cv2.THRESH_BINARY)
                     #_, t0 = cv2.threshold(y[0], 0, 255, cv2.THRESH_BINARY)
                     # print(x[0].astype(np.uint8).transpose())
@@ -275,10 +287,12 @@ class RunTask:
                     # print(p0)
                     # print(t0)
 
-                    #print(panel_contours)
+                    # print(panel_contours)
 
-                    cv2.imwrite(str(pred_dir) + '/' + '{:04}'.format(cnt) + "_half_image.png", x0)
-                    cv2.imwrite(str(pred_dir) + '/' + '{:04}'.format(cnt) + "_half_pred.png", p0)
+                    cv2.imwrite(str(pred_dir) + '/' +
+                                '{:04}'.format(cnt) + "_half_image.png", x0)
+                    cv2.imwrite(str(pred_dir) + '/' +
+                                '{:04}'.format(cnt) + "_half_pred.png", p0)
                     #cv2.imwrite(str(pred_dir / f"{cnt}_true.png"), t0)
                     cnt += 1
 
@@ -298,7 +312,8 @@ class RunTask:
 
         model_dir = Path(model_folder)
         model = Segmenter()
-        if device.type != 'cpu': model = model.cuda()
+        if device.type != 'cpu':
+            model = model.cuda()
 
         model.load_state_dict(torch.load(model_dir / 'segmenter.model'))
 
@@ -309,11 +324,13 @@ class RunTask:
 
         for ind in indivi_dir:
             dataloader = DataLoader(SegmenterDataset(processed_folder=Path(ind),
-                                                        transform_images=False),
-                                                        batch_size=1)
+                                                     transform_images=False),
+                                    batch_size=1)
             images, preds, true = [], [], []
-            pred_dir = Path(output_folder) / os.path.basename(ind)
-            if not pred_dir.exists(): pred_dir.mkdir(parents=True)
+            pred_dir = Path(output_folder) / \
+                os.path.basename(ind)
+            if not pred_dir.exists():
+                pred_dir.mkdir(parents=True)
             cnt = 0
             import cv2
             with torch.no_grad():
@@ -324,7 +341,7 @@ class RunTask:
                     #y = y.cpu().numpy()
                     images.append(x)
                     preds.append(pred)
-                    #true.append(y)
+                    # true.append(y)
                     _, p0 = cv2.threshold(pred[0], 0.5, 255, cv2.THRESH_BINARY)
                     #_, t0 = cv2.threshold(y[0], 0, 255, cv2.THRESH_BINARY)
                     # print(x[0].astype(np.uint8).transpose())
@@ -338,32 +355,42 @@ class RunTask:
                     # print(t0)
 
                     # 輪郭の検出
-                    contours, hierarchy = cv2.findContours(p0.copy().astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    contours, hierarchy = cv2.findContours(p0.copy().astype(
+                        np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                     panel_contours = []
-                    #print(len(contours))
+                    # print(len(contours))
                     for i in range(len(contours)):
                         area = cv2.contourArea(contours[i])
-                        #if 30 <= area <= 500:
-                            # peri = cv2.arcLength(contours[i], True)
-                            # squareness = 4 * np.pi * area / peri**2
-                            # if 0.3 <= squareness <= 0.8: # https://answers.opencv.org/question/171583/eliminate-unwanted-contours-opencv/
+                        # if 30 <= area <= 500:
+                        # peri = cv2.arcLength(contours[i], True)
+                        # squareness = 4 * np.pi * area / peri**2
+                        # if 0.3 <= squareness <= 0.8: # https://answers.opencv.org/question/171583/eliminate-unwanted-contours-opencv/
                         rect = cv2.minAreaRect(contours[i])
 
                         (x, y), (width, height), angle = rect
                         if max(width, height) > 0:
-                            aspect_ratio = min(width, height) / max(width, height)
+                            aspect_ratio = min(
+                                width, height) / max(width, height)
 
-                            #if 0.2 <= aspect_ratio <= 0.8:
+                            # if 0.2 <= aspect_ratio <= 0.8:
                             box = cv2.boxPoints(rect)
                             box = np.int0(box)
 
-                            #if cv2.contourArea(box) <= 500:
+                            # if cv2.contourArea(box) <= 500:
                             panel_contours.append(box)
 
-                    #print(panel_contours)
-                    im_con = cv2.drawContours(cv2.UMat(np.zeros_like(p0)), panel_contours, -1, 255, -1)
+                    # print(panel_contours)
+                    im_con = cv2.drawContours(
+                        cv2.UMat(np.zeros_like(p0)), panel_contours, -1, 255, -1)
 
-                    cv2.imwrite(str(pred_dir) + '/' + '{:04}'.format(cnt) + "_half_image.png", x0)
-                    cv2.imwrite(str(pred_dir) + '/' + '{:04}'.format(cnt) + "_half_pred.png", im_con)
+                    cv2.imwrite(str(pred_dir) + '/' +
+                                '{:04}'.format(cnt) + "_half_image.png", x0)
+                    cv2.imwrite(str(pred_dir) + '/' +
+                                '{:04}'.format(cnt) + "_half_pred.png", im_con)
+                    contours_dir = Path(pred_dir) / 'contours'
+                    if not contours_dir.exists():
+                        contours_dir.mkdir(parents=True)
+                    with open(str(contours_dir) + '/' + '{:04}'.format(cnt) + '_module_contours.pkl', 'wb') as pkl:
+                        pickle.dump(panel_contours, pkl)
                     #cv2.imwrite(str(pred_dir / f"{cnt}_true.png"), t0)
                     cnt += 1
